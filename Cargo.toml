@@ -9,6 +9,7 @@ futures-io = "0.3.32"
 http = "1.4.0"
 reqwest = { version = "0.13.3", features = ["json", "blocking"] }
 roux = "2.2.15"
+rusqlite = "0.39.0"
 serde_json = "1.0.149"
 tokio = { version = "1.52.3", features = ["full"]}
 youtube_chat = "0.2.2"

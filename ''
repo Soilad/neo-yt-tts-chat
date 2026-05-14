@@ -4,7 +4,7 @@ use serde_json::json;
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::{stdin, stdout, Write};
+use std::io::{stdin, BufWriter,stdout, Write};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use tokio::{task, time};
@@ -49,7 +49,13 @@ async fn share(title: &str, link: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn database(cwd: String, user: &str, message: &str) -> Result<(), Box<dyn Error>> {
+async fn database(user: &str, message: &str) -> Result<(), Box<dyn Error>> {
+    let binding = env::current_dir().expect("cant get current directory");
+    let cwd = binding
+        .to_str()
+        .expect("why can't i turn the current directory to a string")
+        .to_string();
+
     let conn = Connection::open(cwd.to_owned() + "/chat_logs.db")?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS Scores (
@@ -70,6 +76,19 @@ async fn database(cwd: String, user: &str, message: &str) -> Result<(), Box<dyn 
     print!("w");
     let mut user_file = File::create(cwd.to_owned() + "/user.txt").expect("cannot open file");
     let mut scoreboard_file = File::create(cwd.to_owned() + "/scoreboard.txt").expect("cannot open file");
+    // println!("{}",&file_path);
+    // let mut hashmap_vec = vec![];
+    // Open the file
+    // let file = File::open(&file_path)?;
+    // let reader = io::BufReader::new(file);
+    // Iterate over each line of the file
+    // for line in reader.lines() {
+    //     let line = line?; // Get the next line, handling errors
+    //     if let Some((key, value)) = line.split_once(": ") {
+    //         hashmap_vec.push((key.to_string(), value.to_string().parse::<i32>().unwrap()));
+    //     }
+    // }
+    // println!("{:?}", &hashmap);
     let increment_value: i32 = message.len().try_into().expect("cant get message length");
 
     conn.execute(
@@ -95,10 +114,13 @@ async fn database(cwd: String, user: &str, message: &str) -> Result<(), Box<dyn 
     let mut score_command = conn.prepare("SELECT score FROM Scores WHERE username=?1")?;
     let mut score_rows = score_command.query(params![user])?;
     let score: i32 = score_rows.next()?.unwrap().get("score")?;
-    user_file.write_all(format!("{user}: {score}").as_bytes()).expect("write failed");
+    user_file.write_all(format!("{user}: {score}").as_bytes())
 
     let mut scoreboard_command = conn.prepare("SELECT * FROM Scores ORDER BY score DESC")?;
     let rows = scoreboard_command.query_map( [], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?)))?;
+
+    // let file = File::create(&scoreboard)?;
+    // let mut writer = BufWriter::new(file);
 
     let scoreboard: String = rows.map(
         |row| {
@@ -109,7 +131,15 @@ async fn database(cwd: String, user: &str, message: &str) -> Result<(), Box<dyn 
         String::new(),
         |acc, x| format!("{acc}\n{x}"),
     );
-    scoreboard_file.write_all(scoreboard.as_bytes()).expect("write failed");
+    // for row in rows {
+    //     let (name, score) = row?;
+    //     // writeln!(writer, "{}: {}", name, score)?;
+    // }
+
+    // hashmap_vec.sort_by(|a,b| b.1.cmp(&a.1));
+
+    .expect("write failed");
+
 
     Ok(())
 }
@@ -120,15 +150,14 @@ async fn database(cwd: String, user: &str, message: &str) -> Result<(), Box<dyn 
 //pactl load-module module-virtual-sink sink_name=anime
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let _ = database("fish", "bleb").await;
     let output: &str = "anime";
-    let cwd: String = env::current_dir()
+    let cwd = env::current_dir()
         .expect("cant get current directory")
         .to_str()
         .expect("cant turn the current directory into a str")
-        .to_string()
-        ;
+        .to_string();
 
-    // let _ = database(cwd.clone(), "fish", "bleb").await;
     let pactl = Command::new("pactl")
         .arg("list")
         .arg("sinks")
@@ -193,11 +222,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             .expect("cant tts");
 
                         let mut chat =
-                            File::create(cwd.clone() + "/chat.txt").expect("cannot open file");
+                            File::create(cwd.to_owned() + "/chat.txt").expect("cannot open file");
 
                         let mut enigo = Enigo::new(&Settings::default()).unwrap();
                         let _ = database(
-                            cwd.clone(),
                             chat_item.author.name.as_ref().expect("cant get username"),
                             text,
                         );

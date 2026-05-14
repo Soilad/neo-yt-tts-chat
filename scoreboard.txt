@@ -1,0 +1,2 @@
+skibidi: 90
+fish: 52
